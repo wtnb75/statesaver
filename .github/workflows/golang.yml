@@ -25,7 +25,7 @@ jobs:
     - name: lint
       uses: golangci/golangci-lint-action@v7
     - name: test
-      run: go test -v ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./... -json > report.json
+      run: go test -v ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./... -json | tee report.json
     - name: report
       uses: becheran/go-testreport@main
       with:
