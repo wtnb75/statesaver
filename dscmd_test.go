@@ -213,6 +213,7 @@ func TestPrune_Execute(t *testing.T) {
 	hist := ds.History("test")
 	if len(hist) > 2 {
 		t.Errorf("expected <= 2 versions after prune, got %d", len(hist))
+		t.Logf("history: %+v", hist)
 	}
 }
 

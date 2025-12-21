@@ -383,6 +383,7 @@ func TestPrune(t *testing.T) {
 	hist = ds.History(filename)
 	if len(hist) > 2 {
 		t.Errorf("expected 2 or fewer versions after prune, got %d", len(hist))
+		t.Logf("history: %+v", hist)
 	}
 }
 
