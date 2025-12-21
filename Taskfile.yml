@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  DATA_DIR: data
+
+tasks:
+  default:
+    desc: Print a greeting message
+    cmds:
+      - task -l
+    silent: true
+
+  test:
+    desc: run unittest
+    cmds:
+      - rm -f cover.out
+      - go test -v -cover ./... -coverprofile=cover.out
+      - go tool cover -html=cover.out -o cover.html
+
+  lint:
+    desc: run lint
+    cmds:
+      - golangci-lint run .
+
+  server:
+    desc: boot server
+    cmds:
+      - go run . server -d {{.DATA_DIR}} --verbose
+
+  terraform:
+    desc: run terraform for test server
+    cmds:
+      - cd tf ; terraform {{.CLI_ARGS}}
+
+  run:
+    desc: run statesaver
+    cmds:
+      - go run . -d {{.DATA_DIR}} {{.CLI_ARGS}}

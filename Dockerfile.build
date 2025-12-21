@@ -1,0 +1,7 @@
+FROM golang:1-alpine AS build
+ADD . /src
+RUN cd /src && go build -o statesaver
+
+FROM scratch
+COPY --from=build /src/statesaver /
+ENTRYPOINT ["/statesaver"]

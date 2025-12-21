@@ -1,0 +1,5 @@
+cover*
+data/
+dist/
+.terraform*
+/statesaver
