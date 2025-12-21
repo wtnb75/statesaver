@@ -1,0 +1,19 @@
+services:
+  terraform:
+    image: hashicorp/terraform
+    working_dir: /w
+    volumes:
+    - ./tf:/w
+    command:
+    - plan
+  statesaver:
+    build: .
+    command:
+    - /statesaver
+    - server
+    - --verbose
+    volumes:
+    - ./data:/data
+    environment:
+      STSV_DATADIR: /data
+      TZ: Asia/Tokyo
