@@ -368,6 +368,7 @@ func TestPrune(t *testing.T) {
 		if err != nil {
 			t.Fatalf("write failed: %v", err)
 		}
+		time.Sleep(1 * time.Second)
 	}
 
 	hist := ds.History(filename)
