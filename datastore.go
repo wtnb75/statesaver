@@ -16,7 +16,19 @@ import (
 	"github.com/spf13/afero"
 )
 
+type DsIf interface {
+	Read(name string, out io.Writer) error
+	Delete(name string) error
+	Write(name string, input io.Reader, hash []byte, lockid string) error
+	Lock(name string, lockinfo string) error
+	Unlock(name string, lockinfo string) error
+	Walk(fn func(e FileEntry) error) error
+	History(path string) []FileEntry
+	ReadHistory(name string, history string) (io.ReadCloser, error)
+}
+
 type Datastore struct {
+	DsIf
 	RootDir  *afero.BasePathFs
 	RootName string
 }
