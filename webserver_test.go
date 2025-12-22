@@ -50,6 +50,18 @@ func (m *mockDS) Unlock(name string, lockinfo string) error {
 	return m.unlockErr
 }
 
+func (m *mockDS) History(name string) []FileEntry {
+	return nil
+}
+
+func (m *mockDS) ReadHistory(name string, target string) (io.ReadCloser, error) {
+	return nil, nil
+}
+
+func (m *mockDS) Walk(func(entry FileEntry) error) error {
+	return nil
+}
+
 func TestAPIGet_Success(t *testing.T) {
 	ds := &mockDS{readBody: "hello"}
 	h := &APIHandler{ds: ds}
