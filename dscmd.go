@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/confluentinc/go-editor"
@@ -70,6 +71,7 @@ type Put struct {
 	Prefix string `short:"p" long:"prefix" description:"output prefix"`
 	Lock   string `long:"lock" description:"lock string"`
 	Hash   bool   `long:"hash" description:"using hash"`
+	NoJson bool   `long:"no-json" description:"do not validate JSON"`
 }
 
 // LockStruct represents a lock structure
@@ -87,6 +89,19 @@ func (cmd *Put) Execute(args []string) error {
 			continue
 		}
 		defer fp.Close()
+		if !cmd.NoJson {
+			buf := &bytes.Buffer{}
+			if _, err := io.Copy(buf, fp); err != nil {
+				slog.Error("read file", "name", v, "error", err)
+				continue
+			}
+			if root.ParseJSON(buf.String()) == nil {
+				slog.Error("invalid json", "name", v)
+				continue
+			}
+			// Reset file pointer
+			fp.Seek(0, io.SeekStart)
+		}
 		err = root.Write(cmd.Prefix+v, fp, []byte{}, cmd.Lock)
 		if err != nil {
 			slog.Error("put failed", "error", err, "name", cmd.Prefix+v)
@@ -214,21 +229,29 @@ func (cmd *EditFile) Execute(args []string) error {
 		edit = editor.NewEditor()
 	}
 	old := buf.Bytes()
+	olddata := root.ParseJSON(string(old))
+	if olddata != nil {
+		if b, err := json.MarshalIndent(olddata, "", "  "); err == nil {
+			old = b
+		}
+	}
 	edited, path, err := edit.LaunchTempFile(filepath.Base(args[0]), buf)
 	defer os.Remove(path)
 	if err != nil {
 		slog.Error("edit failed", "name", args[0], "error", err)
+		if strings.Contains(err.Error(), "no changes made") {
+			return ErrNotChanged
+		}
 		return err
 	}
 	if bytes.Equal(edited, old) {
 		slog.Info("no changes made", "name", args[0])
-		return nil
+		return ErrNotChanged
 	}
-	olddata := root.ParseJSON(string(old))
 	newdata := root.ParseJSON(string(edited))
 	if olddata != nil && newdata != nil && reflect.DeepEqual(olddata, newdata) {
 		slog.Info("no changes in data", "name", args[0])
-		return nil
+		return ErrNotChanged
 	}
 	slog.Info("change", "name", args[0], "before", string(old), "after", string(edited))
 	return root.Write(args[0], bytes.NewReader(edited), []byte{}, "")

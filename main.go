@@ -57,9 +57,11 @@ func realMain() int {
 		if _, ok := err.(*flags.Error); ok {
 			return 0
 		}
-		slog.Error("error exit", "error", err)
-		parser.WriteHelp(os.Stdout)
-		return 1
+		if err != ErrNotChanged {
+			slog.Error("error exit", "error", err)
+			parser.WriteHelp(os.Stdout)
+			return 1
+		}
 	}
 	return 0
 }

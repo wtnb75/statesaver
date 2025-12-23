@@ -24,9 +24,9 @@
                     {{- $mark = "*"}}
                 {{- end}}
                 {{- if (or (and (eq $name "") $h.Locked) (eq $name $h.Name))}}
-                <li class="nav-item"><a href="?history={{$h.Name}}" class="nav-link active" aria-current="page">{{$mark}}{{mytime $h.Timestamp}} ({{.Size}})</a></li>
+                <li class="nav-item"><a href="?history={{$h.Name}}" class="nav-link active" aria-current="page">{{$mark}}{{mytime $h.Timestamp}} ({{mybytes .Size}})</a></li>
                 {{- else}}
-                <li class="nav-item"><a href="?history={{$h.Name}}" class="nav-link">{{$mark}}{{mytime $h.Timestamp}} ({{$h.Size}})</a></li>
+                <li class="nav-item"><a href="?history={{$h.Name}}" class="nav-link">{{$mark}}{{mytime $h.Timestamp}} ({{mybytes $h.Size}})</a></li>
                 {{- end}}
             {{- end}}
         </ul>
