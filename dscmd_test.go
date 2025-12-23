@@ -115,7 +115,7 @@ func TestCat_ExecuteNotFound(t *testing.T) {
 	}
 }
 
-func TestPut_Execute(t *testing.T) {
+func TestPut_ExecuteNoJson(t *testing.T) {
 	tmp := t.TempDir()
 	origDatadir := option.Datadir
 	option.Datadir = tmp
@@ -124,6 +124,35 @@ func TestPut_Execute(t *testing.T) {
 	// Create a temporary input file
 	tmpFile := filepath.Join(tmp, "input.txt")
 	if err := os.WriteFile(tmpFile, []byte("test data"), 0o644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+
+	cmd := &Put{Prefix: "prefix_", Lock: "", Hash: false, NoJson: true}
+	err := cmd.Execute([]string{tmpFile})
+	if err != nil {
+		t.Errorf("Put.Execute() failed: %v", err)
+	}
+
+	// Verify the file was written
+	ds := NewDatastore(tmp)
+	var buf bytes.Buffer
+	if err := ds.Read("prefix_"+tmpFile, &buf); err != nil {
+		t.Errorf("Read after Put failed: %v", err)
+	}
+	if buf.String() != "test data" {
+		t.Errorf("expected 'test data', got %q", buf.String())
+	}
+}
+
+func TestPut_Execute(t *testing.T) {
+	tmp := t.TempDir()
+	origDatadir := option.Datadir
+	option.Datadir = tmp
+	defer func() { option.Datadir = origDatadir }()
+
+	// Create a temporary input file
+	tmpFile := filepath.Join(tmp, "input.txt")
+	if err := os.WriteFile(tmpFile, []byte(`{"hello":"world"}`), 0o644); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 
@@ -139,8 +168,8 @@ func TestPut_Execute(t *testing.T) {
 	if err := ds.Read("prefix_"+tmpFile, &buf); err != nil {
 		t.Errorf("Read after Put failed: %v", err)
 	}
-	if buf.String() != "test data" {
-		t.Errorf("expected 'test data', got %q", buf.String())
+	if buf.String() != `{"hello":"world"}` {
+		t.Errorf("expected '{\"hello\":\"world\"}', got %q", buf.String())
 	}
 }
 
