@@ -18,10 +18,12 @@ import (
 	"github.com/Masterminds/sprig/v3"
 )
 
+// APIHandler serves API requests for terraform state backends
 type APIHandler struct {
 	ds DsIf
 }
 
+// APIGet handles GET requests to retrieve file contents
 func (h *APIHandler) APIGet(path string, w io.Writer, r *http.Request) error {
 	hist := r.URL.Query().Get("history")
 	if hist == "" {
@@ -37,10 +39,12 @@ func (h *APIHandler) APIGet(path string, w io.Writer, r *http.Request) error {
 	}
 }
 
+// APIDelete handles DELETE requests to remove files
 func (h *APIHandler) APIDelete(path string, w io.Writer, r *http.Request) error {
 	return h.ds.Delete(path)
 }
 
+// APIPost handles POST requests to write file contents
 func (h *APIHandler) APIPost(path string, w io.Writer, r *http.Request) error {
 	hashb, err0 := base64.StdEncoding.DecodeString(r.Header.Get("content-md5"))
 	if err0 != nil {
@@ -50,6 +54,7 @@ func (h *APIHandler) APIPost(path string, w io.Writer, r *http.Request) error {
 	return h.ds.Write(path, r.Body, hashb, lockid)
 }
 
+// APILock handles LOCK requests to lock a file
 func (h *APIHandler) APILock(path string, w io.Writer, r *http.Request) error {
 	body, err0 := io.ReadAll(r.Body)
 	if err0 != nil {
@@ -59,6 +64,7 @@ func (h *APIHandler) APILock(path string, w io.Writer, r *http.Request) error {
 	return h.ds.Lock(path, string(body))
 }
 
+// APIUnlock handles UNLOCK requests to unlock a file
 func (h *APIHandler) APIUnlock(path string, w io.Writer, r *http.Request) error {
 	body, err0 := io.ReadAll(r.Body)
 	if err0 != nil {
@@ -68,6 +74,7 @@ func (h *APIHandler) APIUnlock(path string, w io.Writer, r *http.Request) error 
 	return h.ds.Unlock(path, string(body))
 }
 
+// ServeHTTP routes HTTP requests to the appropriate API handler methods
 func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	st := time.Now()
 	slog.Info("access", "method", r.Method, "path", r.URL.Path, "params", r.URL.Query(), "headers", r.Header)
@@ -115,11 +122,13 @@ func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	slog.Info("response", "status", http.StatusText(statuscode), "method", r.Method, "path", r.URL.Path, "elapsed", elapsed)
 }
 
+// HTMLHandler serves HTML pages for the web interface
 type HTMLHandler struct {
 	ds   DsIf
 	fmap template.FuncMap
 }
 
+// Index serves the index page listing all files
 func (h *HTMLHandler) Index(path string, w io.Writer, r *http.Request) error {
 	tmpl, err := template.New("list.html").Funcs(h.fmap).ParseFS(template_files, "templates/list.html")
 	if err != nil {
@@ -134,6 +143,7 @@ func (h *HTMLHandler) Index(path string, w io.Writer, r *http.Request) error {
 	entries := make(map[string]interface{})
 	entries["Files"] = files
 	entries["Title"] = "index"
+	slog.Debug("entries", "files", files)
 
 	if err := tmpl.Execute(w, entries); err != nil {
 		slog.Error("template execute failed", "path", path, "error", err)
@@ -142,6 +152,7 @@ func (h *HTMLHandler) Index(path string, w io.Writer, r *http.Request) error {
 	return nil
 }
 
+// Resource serves static resources like CSS and JS files
 func (h *HTMLHandler) Resource(path string, w io.Writer, r *http.Request) error {
 	buf, err := template_files.ReadFile(filepath.Join("templates", path))
 	if err != nil {
@@ -152,6 +163,7 @@ func (h *HTMLHandler) Resource(path string, w io.Writer, r *http.Request) error 
 	return err
 }
 
+// ViewFile serves the detailed view of a specific file
 func (h *HTMLHandler) ViewFile(name string, w io.Writer, r *http.Request) error {
 	tmpl, err := template.New("view.html").Funcs(h.fmap).ParseFS(template_files, "templates/view.html")
 	if err != nil {
@@ -197,6 +209,7 @@ func (h *HTMLHandler) ViewFile(name string, w io.Writer, r *http.Request) error 
 	return nil
 }
 
+// ServeHTTP routes HTTP requests to the appropriate HTML handler methods
 func (h *HTMLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	st := time.Now()
 	slog.Info("access", "method", r.Method, "path", r.URL.Path, "params", r.URL.Query(), "headers", r.Header)
@@ -244,6 +257,7 @@ func (h *HTMLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	slog.Info("response", "status", http.StatusText(statuscode), "method", r.Method, "path", r.URL.Path, "elapsed", elapsed)
 }
 
+// WebServer represents the web server command
 type WebServer struct {
 	Listen        string `short:"l" long:"listen" default:":3000" env:"STSV_LISTEN" description:"listen address"`
 	Auth          string `short:"u" long:"user" description:"basic auth username:password"`
@@ -254,8 +268,11 @@ type WebServer struct {
 }
 
 func mytime(ts *time.Time) template.HTML {
-	duration := time.Since(*ts).Truncate(time.Minute)
-	return template.HTML(fmt.Sprintf("<abbr title=\"%s\" class=\"default\">%s</abbr>", ts.Format(time.RFC3339), strings.TrimSuffix(duration.String(), "0s")))
+	duration := strings.TrimSuffix(time.Since(*ts).Truncate(time.Minute).String(), "0s")
+	if duration == "" {
+		duration = "just now"
+	}
+	return template.HTML(fmt.Sprintf("<abbr title=\"%s\" class=\"default\">%s</abbr>", ts.Format(time.RFC3339), duration))
 }
 
 func (cmd *WebServer) Execute(args []string) error {

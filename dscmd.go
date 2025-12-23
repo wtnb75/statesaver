@@ -7,9 +7,15 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
 	"time"
+
+	"github.com/confluentinc/go-editor"
 )
 
+// LsTree lists the files in the datastore
 type LsTree struct {
 }
 
@@ -30,6 +36,7 @@ func (cmd *LsTree) Execute(args []string) error {
 	return err
 }
 
+// Cat outputs the contents of files in the datastore
 type Cat struct {
 	JSON bool `short:"j" long:"json" description:"read as json, output compat json"`
 }
@@ -59,12 +66,14 @@ func (cmd *Cat) Execute(args []string) error {
 	return nil
 }
 
+// Put stores files into the datastore
 type Put struct {
 	Prefix string `short:"p" long:"prefix" description:"output prefix"`
 	Lock   string `long:"lock" description:"lock string"`
 	Hash   bool   `long:"hash" description:"using hash"`
 }
 
+// LockStruct represents a lock structure
 type LockStruct struct {
 	ID string
 }
@@ -87,6 +96,7 @@ func (cmd *Put) Execute(args []string) error {
 	return nil
 }
 
+// History lists the history of files in the datastore
 type History struct {
 }
 
@@ -106,6 +116,7 @@ func (cmd *History) Execute(args []string) error {
 	return nil
 }
 
+// Prune removes old history entries from the datastore
 type Prune struct {
 	Keep int  `short:"k" long:"keep" description:"keep generations" default:"5"`
 	Dry  bool `short:"n" long:"dry-run" description:"do not remove"`
@@ -132,6 +143,7 @@ func (cmd *Prune) Execute(args []string) error {
 	return nil
 }
 
+// HistoryCat outputs the contents of historical versions of files
 type HistoryCat struct {
 	File string `short:"f" long:"file" description:"file name"`
 }
@@ -152,13 +164,58 @@ func (cmd *HistoryCat) Execute(args []string) error {
 	return nil
 }
 
+// HistoryRollback rolls back a file to a specified historical version
 type HistoryRollback struct {
-	File    string `short:"f" long:"file" description:"file name"`
-	History string `short:"t" long:"history" description:"rollback to"`
+	File    string `short:"f" long:"file" description:"file name" required:"true"`
+	History string `short:"t" long:"history" description:"rollback to" required:"true"`
 }
 
 func (cmd *HistoryRollback) Execute(args []string) error {
 	init_log()
 	root := NewDatastore(option.Datadir)
 	return root.Rollback(cmd.File, cmd.History)
+}
+
+// EditFile represents an edit file command
+type EditFile struct {
+}
+
+func (cmd *EditFile) Execute(args []string) error {
+	init_log()
+	root := NewDatastore(option.Datadir)
+	buf := &bytes.Buffer{}
+	if err := root.Read(args[0], buf); err != nil {
+		slog.Error("read failed", "name", args[0], "error", err)
+		return err
+	}
+	slog.Info("launch editor", "name", args[0])
+	edit := editor.NewEditor()
+	old := buf.Bytes()
+	edited, path, err := edit.LaunchTempFile(filepath.Base(args[0]), buf)
+	defer os.Remove(path)
+	if err != nil {
+		slog.Error("edit failed", "name", args[0], "error", err)
+		return err
+	}
+	if bytes.Equal(edited, old) {
+		slog.Info("no changes made", "name", args[0])
+		return nil
+	}
+	olddata := root.ParseJSON(string(old))
+	newdata := root.ParseJSON(string(edited))
+	if olddata != nil && newdata != nil && reflect.DeepEqual(olddata, newdata) {
+		slog.Info("no changes in data", "name", args[0])
+		return nil
+	}
+	if newdata == nil {
+		fmt.Print("warning: edited content is not valid JSON. save it? (y/n): ")
+		var resp string
+		fmt.Scan(&resp)
+		resp = strings.ToLower(strings.TrimSpace(resp))
+		if resp != "y" {
+			return fmt.Errorf("aborted by user")
+		}
+	}
+	slog.Info("change", "name", args[0], "before", string(old), "after", string(edited))
+	return root.Write(args[0], bytes.NewReader(edited), []byte{}, "")
 }
