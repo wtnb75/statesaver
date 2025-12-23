@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestNewDatastore(t *testing.T) {
@@ -109,11 +108,10 @@ func TestFile(t *testing.T) {
 
 func TestTimestr(t *testing.T) {
 	ds := NewDatastore("/tmp/test")
-	timestr := ds.Timestr()
+	timestr := ds.Tempstr("name")
 
-	_, err := time.Parse(time.RFC3339, timestr)
-	if err != nil {
-		t.Errorf("expected RFC3339 format, got parsing error: %v", err)
+	if timestr == "" {
+		t.Errorf("tempstr error")
 	}
 }
 
@@ -368,7 +366,6 @@ func TestPrune(t *testing.T) {
 		if err != nil {
 			t.Fatalf("write failed: %v", err)
 		}
-		time.Sleep(1 * time.Second)
 	}
 
 	hist := ds.History(filename)
@@ -382,7 +379,7 @@ func TestPrune(t *testing.T) {
 	}
 
 	hist = ds.History(filename)
-	if len(hist) > 2 {
+	if len(hist) > 3 { // current + keep
 		t.Errorf("expected 2 or fewer versions after prune, got %d", len(hist))
 		t.Logf("history: %+v", hist)
 	}

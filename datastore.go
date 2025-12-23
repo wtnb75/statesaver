@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/spf13/afero"
@@ -61,9 +62,8 @@ func (d *Datastore) File(name ...string) (string, error) {
 	return filepath.Rel(d.RootName, ret)
 }
 
-func (d *Datastore) Timestr() string {
-	// Use RFC3339Nano to avoid collisions when multiple writes occur within the same second.
-	return time.Now().Format(time.RFC3339Nano)
+func (d *Datastore) Tempstr(name string) string {
+	return strconv.FormatInt(time.Now().UnixNano(), 32)
 }
 
 func (d *Datastore) set_current(name string, target string) error {
@@ -96,7 +96,7 @@ func (d *Datastore) set_current(name string, target string) error {
 
 func (d *Datastore) Write(name string, input io.Reader, hash []byte, lockid string) error {
 	slog.Debug("write", "name", name, "hash", fmt.Sprintf("%x", hash), "lockid", lockid)
-	newname, err := d.File(name, d.Timestr())
+	newname, err := d.File(name, d.Tempstr(name))
 	if err != nil {
 		slog.Error("invalid filename?", "name", name, "error", err)
 		return ErrInvalidPath
@@ -354,12 +354,14 @@ func (d *Datastore) Rollback(name string, history string) error {
 
 func (d *Datastore) Prune(name string, keep int, dry bool) error {
 	ent := d.History(name)
+	slog.Debug("prune", "length", len(ent), "names", ent)
 	if len(ent) <= keep {
 		slog.Debug("nothing to do", "entries", len(ent), "keep", keep)
 		return nil
 	}
 	for _, i := range ent[keep:] {
 		if i.Locked {
+			slog.Debug("skip current", "name", i.Name)
 			continue
 		}
 		path, err := d.File(name, i.Name)
@@ -367,7 +369,7 @@ func (d *Datastore) Prune(name string, keep int, dry bool) error {
 			slog.Error("invalid history name", "name", name, "history", i.Name, "error", err)
 			return err
 		}
-		slog.Info("removing", "name", name, "history", i.Name, "dry", dry)
+		slog.Info("removing", "name", name, "history", i.Name, "dry", dry, "path", path)
 		if !dry {
 			if err := d.RootDir.Remove(path); err != nil {
 				slog.Error("cannot remove", "name", name, "history", i.Name, "path", path, "error", err)
