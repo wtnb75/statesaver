@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"io"
 	"log/slog"
@@ -22,7 +23,18 @@ type APIHandler struct {
 }
 
 func (h *APIHandler) APIGet(path string, w io.Writer, r *http.Request) error {
-	return h.ds.Read(path, w)
+	hist := r.URL.Query().Get("history")
+	if hist == "" {
+		return h.ds.Read(path, w)
+	}
+	if ior, err := h.ds.ReadHistory(path, hist); err != nil {
+		slog.Error("cannot read history", "error", err, "path", path, "history", hist)
+		return err
+	} else {
+		defer ior.Close()
+		_, err = io.Copy(w, ior)
+		return err
+	}
 }
 
 func (h *APIHandler) APIDelete(path string, w io.Writer, r *http.Request) error {
@@ -104,11 +116,12 @@ func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type HTMLHandler struct {
-	ds DsIf
+	ds   DsIf
+	fmap template.FuncMap
 }
 
 func (h *HTMLHandler) Index(path string, w io.Writer, r *http.Request) error {
-	tmpl, err := template.New("list.html").Funcs(sprig.FuncMap()).ParseFS(template_files, "templates/list.html")
+	tmpl, err := template.New("list.html").Funcs(h.fmap).ParseFS(template_files, "templates/list.html")
 	if err != nil {
 		slog.Error("template load failed", "path", path, "error", err)
 		return err
@@ -120,6 +133,7 @@ func (h *HTMLHandler) Index(path string, w io.Writer, r *http.Request) error {
 	})
 	entries := make(map[string]interface{})
 	entries["Files"] = files
+	entries["Title"] = "index"
 
 	if err := tmpl.Execute(w, entries); err != nil {
 		slog.Error("template execute failed", "path", path, "error", err)
@@ -139,7 +153,7 @@ func (h *HTMLHandler) Resource(path string, w io.Writer, r *http.Request) error 
 }
 
 func (h *HTMLHandler) ViewFile(name string, w io.Writer, r *http.Request) error {
-	tmpl, err := template.New("view.html").Funcs(sprig.FuncMap()).ParseFS(template_files, "templates/view.html")
+	tmpl, err := template.New("view.html").Funcs(h.fmap).ParseFS(template_files, "templates/view.html")
 	if err != nil {
 		slog.Error("template load failed", "name", name, "error", err)
 		return err
@@ -165,14 +179,17 @@ func (h *HTMLHandler) ViewFile(name string, w io.Writer, r *http.Request) error 
 			return err
 		}
 	}
-	current := make(map[string]interface{})
-	if err := json.Unmarshal(buf.Bytes(), &current); err != nil {
+	target_data := make(map[string]interface{})
+	if err := json.Unmarshal(buf.Bytes(), &target_data); err != nil {
 		slog.Error("json decode", "name", name, "error", err)
 		return err
 	}
 	data := make(map[string]interface{})
-	data["current"] = current
+	data["name"] = target
+	data["file"] = name
+	data["data"] = target_data
 	data["history"] = historyfiles
+	data["Title"] = name
 	if err := tmpl.Execute(w, data); err != nil {
 		slog.Error("template", "name", name, "error", err)
 		return err
@@ -236,6 +253,11 @@ type WebServer struct {
 	htmlhandler   *HTMLHandler
 }
 
+func mytime(ts *time.Time) template.HTML {
+	duration := time.Since(*ts).Truncate(time.Minute)
+	return template.HTML(fmt.Sprintf("<abbr title=\"%s\" class=\"default\">%s</abbr>", ts.Format(time.RFC3339), strings.TrimSuffix(duration.String(), "0s")))
+}
+
 func (cmd *WebServer) Execute(args []string) error {
 	init_log()
 	cmd.server = http.NewServeMux()
@@ -244,8 +266,10 @@ func (cmd *WebServer) Execute(args []string) error {
 		ds: &d,
 	}
 	cmd.htmlhandler = &HTMLHandler{
-		ds: &d,
+		ds:   &d,
+		fmap: sprig.FuncMap(),
 	}
+	cmd.htmlhandler.fmap["mytime"] = mytime
 	cmd.server.Handle("/api/", cmd.apihandler)
 	cmd.server.Handle("/html/", cmd.htmlhandler)
 	slog.Info("starting server", "address", cmd.Listen)
