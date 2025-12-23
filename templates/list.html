@@ -17,7 +17,7 @@
         <div class="p-2">
             <ul>
             {{- range .Files}}
-            <li><a href="view/{{trimPrefix "/" .Name}}">{{.Name}}</a>{{if .Locked}}*{{end}} ({{.Size}}, {{mytime .Timestamp}})</li>
+            <li><a href="view/{{trimPrefix "/" .Name}}">{{.Name}}</a>{{if .Locked}}*{{end}} ({{mybytes .Size}}, {{mytime .Timestamp}})</li>
             {{- end}}
             </ul>
         </div>

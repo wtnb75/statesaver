@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/sprig/v3"
+	"github.com/dustin/go-humanize"
 )
 
 // APIHandler serves API requests for terraform state backends
@@ -194,7 +195,7 @@ func (h *HTMLHandler) ViewFile(name string, w io.Writer, r *http.Request) error 
 	target_data := make(map[string]interface{})
 	if err := json.Unmarshal(buf.Bytes(), &target_data); err != nil {
 		slog.Error("json decode", "name", name, "error", err)
-		return err
+		target_data["invalid json"] = buf.String()
 	}
 	data := make(map[string]interface{})
 	data["name"] = target
@@ -268,11 +269,12 @@ type WebServer struct {
 }
 
 func mytime(ts *time.Time) template.HTML {
-	duration := strings.TrimSuffix(time.Since(*ts).Truncate(time.Minute).String(), "0s")
-	if duration == "" {
-		duration = "just now"
-	}
+	duration := humanize.RelTime(time.Now(), *ts, "", "")
 	return template.HTML(fmt.Sprintf("<abbr title=\"%s\" class=\"default\">%s</abbr>", ts.Format(time.RFC3339), duration))
+}
+
+func mybytes(b int64) string {
+	return humanize.IBytes(uint64(b))
 }
 
 func (cmd *WebServer) Execute(args []string) error {
@@ -287,6 +289,7 @@ func (cmd *WebServer) Execute(args []string) error {
 		fmap: sprig.FuncMap(),
 	}
 	cmd.htmlhandler.fmap["mytime"] = mytime
+	cmd.htmlhandler.fmap["mybytes"] = mybytes
 	cmd.server.Handle("/api/", cmd.apihandler)
 	cmd.server.Handle("/html/", cmd.htmlhandler)
 	slog.Info("starting server", "address", cmd.Listen)
