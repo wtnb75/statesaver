@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/afero"
 )
 
+// DsIf is the interface for datastore operations
 type DsIf interface {
 	Read(name string, out io.Writer) error
 	Delete(name string) error
@@ -28,12 +29,14 @@ type DsIf interface {
 	ReadHistory(name string, history string) (io.ReadCloser, error)
 }
 
+// Datastore implements DsIf using the afero.BasePathFs
 type Datastore struct {
 	DsIf
 	RootDir  *afero.BasePathFs
 	RootName string
 }
 
+// NewDatastore creates a new Datastore rooted at the given directory
 func NewDatastore(root string) Datastore {
 	bpfs := afero.NewBasePathFs(afero.NewOsFs(), root)
 	return Datastore{
@@ -42,6 +45,7 @@ func NewDatastore(root string) Datastore {
 	}
 }
 
+// ParseJSON parses a JSON string into a map
 func (d *Datastore) ParseJSON(data string) map[string]interface{} {
 	res := make(map[string]interface{})
 	if err := json.Unmarshal([]byte(data), &res); err != nil {
@@ -51,6 +55,7 @@ func (d *Datastore) ParseJSON(data string) map[string]interface{} {
 	return res
 }
 
+// File constructs a file path within the datastore
 func (d *Datastore) File(name ...string) (string, error) {
 	slog.Debug("find file", "name", name)
 	path := filepath.Join(name...)
@@ -62,10 +67,12 @@ func (d *Datastore) File(name ...string) (string, error) {
 	return filepath.Rel(d.RootName, ret)
 }
 
+// Tempstr generates a temporary string for file naming
 func (d *Datastore) Tempstr(name string) string {
 	return strconv.FormatInt(time.Now().UnixNano(), 32)
 }
 
+// set_current sets the 'current' symlink to point to the target file
 func (d *Datastore) set_current(name string, target string) error {
 	if linkto, err := d.File(name, "current"); err != nil {
 		slog.Error("invalid filename?", "name", name, "error", err)
@@ -94,6 +101,7 @@ func (d *Datastore) set_current(name string, target string) error {
 	return nil
 }
 
+// Write writes data to a file in the datastore
 func (d *Datastore) Write(name string, input io.Reader, hash []byte, lockid string) error {
 	slog.Debug("write", "name", name, "hash", fmt.Sprintf("%x", hash), "lockid", lockid)
 	newname, err := d.File(name, d.Tempstr(name))
@@ -134,6 +142,7 @@ func (d *Datastore) Write(name string, input io.Reader, hash []byte, lockid stri
 	return d.set_current(name, filepath.Base(newname))
 }
 
+// Read reads data from a file in the datastore
 func (d *Datastore) Read(name string, out io.Writer) error {
 	slog.Debug("read", "name", name)
 	path, err := d.File(name, "current")
@@ -154,6 +163,7 @@ func (d *Datastore) Read(name string, out io.Writer) error {
 	return nil
 }
 
+// Delete removes a file from the datastore
 func (d *Datastore) Delete(name string) error {
 	slog.Debug("delete", "name", name)
 	path, err := d.File(name, "current")
@@ -168,6 +178,7 @@ func (d *Datastore) Delete(name string) error {
 	return nil
 }
 
+// Lock locks a file in the datastore
 func (d *Datastore) Lock(name string, lockinfo string) error {
 	slog.Debug("lock", "name", name, "lockinfo", lockinfo)
 	path, err := d.File(name, "lock")
@@ -186,6 +197,7 @@ func (d *Datastore) Lock(name string, lockinfo string) error {
 	return afero.WriteFile(d.RootDir, path, []byte(lockinfo), 0o644)
 }
 
+// LockRead reads the lock information for a file
 func (d *Datastore) LockRead(name string) (string, error) {
 	slog.Debug("lock-read", "name", name)
 	path, err := d.File(name, "lock")
@@ -201,6 +213,7 @@ func (d *Datastore) LockRead(name string) (string, error) {
 	return string(content), nil
 }
 
+// LockCheck checks if the provided lock ID matches the stored lock
 func (d *Datastore) LockCheck(name string, lockid string) error {
 	slog.Debug("cheking lock")
 	if lockstr, err := d.LockRead(name); err == nil {
@@ -213,6 +226,7 @@ func (d *Datastore) LockCheck(name string, lockid string) error {
 	return nil
 }
 
+// Unlock unlocks a file in the datastore
 func (d *Datastore) Unlock(name string, lockinfo string) error {
 	slog.Debug("unlock", "name", name, "lockinfo", lockinfo)
 	path, err := d.File(name, "lock")
@@ -239,6 +253,7 @@ func (d *Datastore) Unlock(name string, lockinfo string) error {
 	return nil
 }
 
+// FileEntry represents a file entry in the datastore
 type FileEntry struct {
 	Name      string
 	Locked    bool
@@ -246,6 +261,7 @@ type FileEntry struct {
 	Size      int64
 }
 
+// Walk walks through all files in the datastore and applies the given function
 func (d *Datastore) Walk(fn func(e FileEntry) error) error {
 	slog.Debug("walk", "root", d.RootName)
 	return afero.Walk(d.RootDir, "/", func(path string, info fs.FileInfo, err error) error {
@@ -282,6 +298,7 @@ func (d *Datastore) Walk(fn func(e FileEntry) error) error {
 	})
 }
 
+// History retrieves the history of a file in the datastore
 func (d *Datastore) History(path string) []FileEntry {
 	slog.Debug("find history", "path", path)
 	res := []FileEntry{}
@@ -328,6 +345,7 @@ func (d *Datastore) History(path string) []FileEntry {
 	return res
 }
 
+// ReadHistory reads a specific version of a file from the datastore
 func (d *Datastore) ReadHistory(name string, history string) (io.ReadCloser, error) {
 	slog.Debug("reading history", "name", name, "history", history)
 	path, err := d.File(name, history)
@@ -338,6 +356,7 @@ func (d *Datastore) ReadHistory(name string, history string) (io.ReadCloser, err
 	return d.RootDir.Open(path)
 }
 
+// Rollback rolls back a file to a specific history version
 func (d *Datastore) Rollback(name string, history string) error {
 	slog.Debug("rollback to history", "name", name, "history", history)
 	path, err := d.File(name, history)
@@ -352,6 +371,7 @@ func (d *Datastore) Rollback(name string, history string) error {
 	return d.set_current(name, history)
 }
 
+// Prune removes old history versions of a file in the datastore
 func (d *Datastore) Prune(name string, keep int, dry bool) error {
 	ent := d.History(name)
 	slog.Debug("prune", "length", len(ent), "names", ent)

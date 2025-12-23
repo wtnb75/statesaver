@@ -3,17 +3,19 @@ services:
     image: hashicorp/terraform
     working_dir: /w
     volumes:
-    - ./tf:/w
+      - ./tf:/w
     command:
-    - plan
+      - plan
   statesaver:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.build
     command:
-    - /statesaver
-    - server
-    - --verbose
+      - /statesaver
+      - server
+      - --verbose
     volumes:
-    - ./data:/data
+      - ./data:/data
     environment:
       STSV_DATADIR: /data
       TZ: Asia/Tokyo
