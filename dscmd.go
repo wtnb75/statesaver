@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/confluentinc/go-editor"
@@ -176,8 +175,26 @@ func (cmd *HistoryRollback) Execute(args []string) error {
 	return root.Rollback(cmd.File, cmd.History)
 }
 
+type chkjson struct {
+	editor.Schema
+	ds Datastore
+}
+
+// ValidateBytes simply checks if the provided data is valid JSON
+func (s *chkjson) ValidateBytes(data []byte) error {
+	if s.ds.ParseJSON(string(data)) == nil {
+		return fmt.Errorf("invalid json")
+	}
+	return nil
+}
+
 // EditFile represents an edit file command
 type EditFile struct {
+	NoJson bool `long:"no-json" description:"do not validate JSON"`
+}
+
+type Editor interface {
+	LaunchTempFile(prefix string, initialContent io.Reader) (edited []byte, path string, err error)
 }
 
 func (cmd *EditFile) Execute(args []string) error {
@@ -189,7 +206,13 @@ func (cmd *EditFile) Execute(args []string) error {
 		return err
 	}
 	slog.Info("launch editor", "name", args[0])
-	edit := editor.NewEditor()
+	schema := &chkjson{ds: root}
+	var edit Editor
+	if !cmd.NoJson {
+		edit = editor.NewValidatingEditor(schema)
+	} else {
+		edit = editor.NewEditor()
+	}
 	old := buf.Bytes()
 	edited, path, err := edit.LaunchTempFile(filepath.Base(args[0]), buf)
 	defer os.Remove(path)
@@ -206,15 +229,6 @@ func (cmd *EditFile) Execute(args []string) error {
 	if olddata != nil && newdata != nil && reflect.DeepEqual(olddata, newdata) {
 		slog.Info("no changes in data", "name", args[0])
 		return nil
-	}
-	if newdata == nil {
-		fmt.Print("warning: edited content is not valid JSON. save it? (y/n): ")
-		var resp string
-		fmt.Scan(&resp)
-		resp = strings.ToLower(strings.TrimSpace(resp))
-		if resp != "y" {
-			return fmt.Errorf("aborted by user")
-		}
 	}
 	slog.Info("change", "name", args[0], "before", string(old), "after", string(edited))
 	return root.Write(args[0], bytes.NewReader(edited), []byte{}, "")
