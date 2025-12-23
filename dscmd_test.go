@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 // captureStdout captures stdout during function execution
@@ -202,7 +201,6 @@ func TestPrune_Execute(t *testing.T) {
 		if err := ds.Write("test", reader, []byte{}, ""); err != nil {
 			t.Fatalf("Write failed: %v", err)
 		}
-		time.Sleep(1 * time.Second)
 	}
 
 	cmd := &Prune{Keep: 2, Dry: false, All: false}
@@ -213,8 +211,8 @@ func TestPrune_Execute(t *testing.T) {
 
 	// Verify pruning
 	hist := ds.History("test")
-	if len(hist) > 2 {
-		t.Errorf("expected <= 2 versions after prune, got %d", len(hist))
+	if len(hist) > 3 { // current + keep
+		t.Errorf("expected <= 3 versions after prune, got %d", len(hist))
 		t.Logf("history: %+v", hist)
 	}
 }

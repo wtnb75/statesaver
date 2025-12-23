@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"time"
 )
 
 type LsTree struct {
@@ -16,7 +17,11 @@ func (cmd *LsTree) Execute(args []string) error {
 	init_log()
 	root := NewDatastore(option.Datadir)
 	err := root.Walk(func(e FileEntry) error {
-		fmt.Println(e.Name, e.Size, e.Timestamp, e.Locked)
+		locked := ""
+		if e.Locked {
+			locked = " (locked)"
+		}
+		fmt.Printf("%s %6d %s%s\n", e.Timestamp.Format(time.RFC3339), e.Size, e.Name, locked)
 		return nil
 	})
 	if err != nil {
@@ -91,7 +96,11 @@ func (cmd *History) Execute(args []string) error {
 	for _, v := range args {
 		fmt.Println(v)
 		for _, e := range root.History(v) {
-			fmt.Println("  ", e.Name, e.Size, e.Timestamp, e.Locked)
+			current := ""
+			if e.Locked {
+				current = " (current)"
+			}
+			fmt.Printf("%s %6d %s%s\n", e.Timestamp.Format(time.RFC3339), e.Size, e.Name, current)
 		}
 	}
 	return nil
@@ -108,7 +117,7 @@ func (cmd *Prune) Execute(args []string) error {
 	root := NewDatastore(option.Datadir)
 	if cmd.All {
 		return root.Walk(func(e FileEntry) error {
-			slog.Info("try prune", "name", e.Name)
+			slog.Info("try prune", "name", e.Name, "keep", cmd.Keep, "dry", cmd.Dry)
 			return root.Prune(e.Name, cmd.Keep, cmd.Dry)
 		})
 	} else {
