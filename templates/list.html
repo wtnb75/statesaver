@@ -14,6 +14,7 @@
         </style>
     </head>
     <body>
+        {{- if .Files }}
         <div class="p-2">
             <ul>
             {{- range .Files}}
@@ -21,5 +22,8 @@
             {{- end}}
             </ul>
         </div>
+        {{- else}}
+        <div class="p-2">no content</div>
+        {{- end}}
     </body>
 </html>

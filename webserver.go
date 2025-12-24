@@ -21,7 +21,8 @@ import (
 
 // APIHandler serves API requests for terraform state backends
 type APIHandler struct {
-	ds DsIf
+	ds       DsIf
+	basepath string
 }
 
 // APIGet handles GET requests to retrieve file contents
@@ -81,7 +82,7 @@ func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	slog.Info("access", "method", r.Method, "path", r.URL.Path, "params", r.URL.Query(), "headers", r.Header)
 	var err error
 	buf := &bytes.Buffer{}
-	path := strings.TrimPrefix(r.URL.Path, "/api/")
+	path := r.URL.Path
 	switch r.Method {
 	case http.MethodGet:
 		err = h.APIGet(path, buf, r)
@@ -125,8 +126,9 @@ func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // HTMLHandler serves HTML pages for the web interface
 type HTMLHandler struct {
-	ds   DsIf
-	fmap template.FuncMap
+	ds       DsIf
+	fmap     template.FuncMap
+	basepath string
 }
 
 // Index serves the index page listing all files
@@ -136,14 +138,19 @@ func (h *HTMLHandler) Index(path string, w io.Writer, r *http.Request) error {
 		slog.Error("template load failed", "path", path, "error", err)
 		return err
 	}
+	prefix := r.URL.Query().Get("prefix")
+	if prefix == "" {
+		prefix = "/"
+	}
 	files := make([]FileEntry, 0)
-	h.ds.Walk(func(e FileEntry) error {
+	h.ds.Walk(prefix, func(e FileEntry) error {
 		files = append(files, e)
 		return nil
 	})
 	entries := make(map[string]interface{})
 	entries["Files"] = files
 	entries["Title"] = "index"
+	entries["basepath"] = h.basepath
 	slog.Debug("entries", "files", files)
 
 	if err := tmpl.Execute(w, entries); err != nil {
@@ -179,7 +186,7 @@ func (h *HTMLHandler) ViewFile(name string, w io.Writer, r *http.Request) error 
 		rdc, err := h.ds.ReadHistory(name, target)
 		if err != nil {
 			slog.Error("cannot read history", "name", name, "target", target, "error", err)
-			return err
+			return ErrNotFound
 		}
 		defer rdc.Close()
 		if _, err := io.Copy(buf, rdc); err != nil {
@@ -189,7 +196,7 @@ func (h *HTMLHandler) ViewFile(name string, w io.Writer, r *http.Request) error 
 	} else {
 		if err := h.ds.Read(name, buf); err != nil {
 			slog.Error("read failes", "name", name, "error", err)
-			return err
+			return ErrNotFound
 		}
 	}
 	target_data := make(map[string]interface{})
@@ -203,6 +210,7 @@ func (h *HTMLHandler) ViewFile(name string, w io.Writer, r *http.Request) error 
 	data["data"] = target_data
 	data["history"] = historyfiles
 	data["Title"] = name
+	data["basepath"] = h.basepath
 	if err := tmpl.Execute(w, data); err != nil {
 		slog.Error("template", "name", name, "error", err)
 		return err
@@ -216,7 +224,7 @@ func (h *HTMLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	slog.Info("access", "method", r.Method, "path", r.URL.Path, "params", r.URL.Query(), "headers", r.Header)
 	var err error
 	buf := &bytes.Buffer{}
-	path := strings.TrimPrefix(r.URL.Path, "/html/")
+	path := r.URL.Path
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -247,6 +255,7 @@ func (h *HTMLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case ErrNotFound:
 		statuscode = http.StatusNotFound
 	default:
+		slog.Info("unknown error", "error", err)
 		statuscode = http.StatusInternalServerError
 	}
 	w.WriteHeader(statuscode)
@@ -282,16 +291,18 @@ func (cmd *WebServer) Execute(args []string) error {
 	cmd.server = http.NewServeMux()
 	d := NewDatastore(option.Datadir)
 	cmd.apihandler = &APIHandler{
-		ds: &d,
+		ds:       &d,
+		basepath: "/api/",
 	}
 	cmd.htmlhandler = &HTMLHandler{
-		ds:   &d,
-		fmap: sprig.FuncMap(),
+		ds:       &d,
+		fmap:     sprig.FuncMap(),
+		basepath: "/html/",
 	}
 	cmd.htmlhandler.fmap["mytime"] = mytime
 	cmd.htmlhandler.fmap["mybytes"] = mybytes
-	cmd.server.Handle("/api/", cmd.apihandler)
-	cmd.server.Handle("/html/", cmd.htmlhandler)
+	cmd.server.Handle("/api/", http.StripPrefix(cmd.apihandler.basepath, cmd.apihandler))
+	cmd.server.Handle("/html/", http.StripPrefix(cmd.htmlhandler.basepath, cmd.htmlhandler))
 	slog.Info("starting server", "address", cmd.Listen)
 	return http.ListenAndServe(cmd.Listen, cmd.server)
 }

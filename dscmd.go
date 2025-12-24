@@ -19,10 +19,8 @@ import (
 type LsTree struct {
 }
 
-func (cmd *LsTree) Execute(args []string) error {
-	init_log()
-	root := NewDatastore(option.Datadir)
-	err := root.Walk(func(e FileEntry) error {
+func (cmd *LsTree) do1(root Datastore, prefix string) error {
+	err := root.Walk(prefix, func(e FileEntry) error {
 		locked := ""
 		if e.Locked {
 			locked = " (locked)"
@@ -34,6 +32,20 @@ func (cmd *LsTree) Execute(args []string) error {
 		slog.Error("walk error", "error", err, "root", root.RootDir)
 	}
 	return err
+}
+
+func (cmd *LsTree) Execute(args []string) error {
+	init_log()
+	root := NewDatastore(option.Datadir)
+	if len(args) == 0 {
+		args = append(args, "/")
+	}
+	for _, v := range args {
+		if err := cmd.do1(root, v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Cat outputs the contents of files in the datastore
@@ -140,11 +152,18 @@ type Prune struct {
 func (cmd *Prune) Execute(args []string) error {
 	init_log()
 	root := NewDatastore(option.Datadir)
+	if len(args) == 0 {
+		args = append(args, "/")
+	}
 	if cmd.All {
-		return root.Walk(func(e FileEntry) error {
-			slog.Info("try prune", "name", e.Name, "keep", cmd.Keep, "dry", cmd.Dry)
-			return root.Prune(e.Name, cmd.Keep, cmd.Dry)
-		})
+		for _, v := range args {
+			if err := root.Walk(v, func(e FileEntry) error {
+				slog.Info("try prune", "name", e.Name, "keep", cmd.Keep, "dry", cmd.Dry)
+				return root.Prune(e.Name, cmd.Keep, cmd.Dry)
+			}); err != nil {
+				return err
+			}
+		}
 	} else {
 		for _, v := range args {
 			fmt.Println(v)
