@@ -16,7 +16,7 @@ tasks:
     desc: run unittest
     cmds:
       - rm -f cover.out
-      - go test -v -cover ./... -coverprofile=cover.out
+      - go test -v -cover ./... -coverprofile=cover.out -failfast
       - go tool cover -html=cover.out -o cover.html
 
   lint:

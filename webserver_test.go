@@ -58,7 +58,7 @@ func (m *mockDS) ReadHistory(name string, target string) (io.ReadCloser, error) 
 	return nil, nil
 }
 
-func (m *mockDS) Walk(func(entry FileEntry) error) error {
+func (m *mockDS) Walk(prefix string, fn func(entry FileEntry) error) error {
 	return nil
 }
 

@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/afero"
@@ -24,7 +25,7 @@ type DsIf interface {
 	Write(name string, input io.Reader, hash []byte, lockid string) error
 	Lock(name string, lockinfo string) error
 	Unlock(name string, lockinfo string) error
-	Walk(fn func(e FileEntry) error) error
+	Walk(prefix string, fn func(e FileEntry) error) error
 	History(path string) []FileEntry
 	ReadHistory(name string, history string) (io.ReadCloser, error)
 }
@@ -262,10 +263,15 @@ type FileEntry struct {
 }
 
 // Walk walks through all files in the datastore and applies the given function
-func (d *Datastore) Walk(fn func(e FileEntry) error) error {
-	slog.Debug("walk", "root", d.RootName)
-	return afero.Walk(d.RootDir, "/", func(path string, info fs.FileInfo, err error) error {
+func (d *Datastore) Walk(prefix string, fn func(e FileEntry) error) error {
+	basedir := filepath.Dir(prefix)
+	slog.Debug("walk", "root", d.RootName, "prefix", prefix, "base", basedir)
+	return afero.Walk(d.RootDir, basedir, func(path string, info fs.FileInfo, err error) error {
 		slog.Debug("walk-cb", "path", path, "info", info, "error", err)
+		if !strings.HasPrefix(path, prefix) {
+			slog.Debug("skip", "path", path, "prefix", prefix)
+			return nil
+		}
 		if err != nil {
 			slog.Error("walkdir", "error", err, "path", path)
 			return err

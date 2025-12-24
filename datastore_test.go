@@ -522,7 +522,7 @@ func TestWalk(t *testing.T) {
 	}
 
 	var entries []FileEntry
-	if err := ds.Walk(func(e FileEntry) error {
+	if err := ds.Walk("/", func(e FileEntry) error {
 		entries = append(entries, e)
 		return nil
 	}); err != nil {
