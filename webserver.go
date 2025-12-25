@@ -17,6 +17,8 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/dustin/go-humanize"
+	"github.com/yudai/gojsondiff"
+	"github.com/yudai/gojsondiff/formatter"
 )
 
 // APIHandler serves API requests for terraform state backends
@@ -133,7 +135,11 @@ type HTMLHandler struct {
 
 // Index serves the index page listing all files
 func (h *HTMLHandler) Index(path string, w io.Writer, r *http.Request) error {
-	tmpl, err := template.New("list.html").Funcs(h.fmap).ParseFS(template_files, "templates/list.html")
+	tmpl_files := []string{
+		"templates/list.html",
+		"templates/_inline_style.html",
+	}
+	tmpl, err := template.New("list.html").Funcs(h.fmap).ParseFS(template_files, tmpl_files...)
 	if err != nil {
 		slog.Error("template load failed", "path", path, "error", err)
 		return err
@@ -173,7 +179,13 @@ func (h *HTMLHandler) Resource(path string, w io.Writer, r *http.Request) error 
 
 // ViewFile serves the detailed view of a specific file
 func (h *HTMLHandler) ViewFile(name string, w io.Writer, r *http.Request) error {
-	tmpl, err := template.New("view.html").Funcs(h.fmap).ParseFS(template_files, "templates/view.html")
+	tmpl_files := []string{
+		"templates/view.html",
+		"templates/_header.html",
+		"templates/_footer.html",
+		"templates/_inline_style.html",
+	}
+	tmpl, err := template.New("view.html").Funcs(h.fmap).ParseFS(template_files, tmpl_files...)
 	if err != nil {
 		slog.Error("template load failed", "name", name, "error", err)
 		return err
@@ -218,6 +230,75 @@ func (h *HTMLHandler) ViewFile(name string, w io.Writer, r *http.Request) error 
 	return nil
 }
 
+// ViewFile serves the detailed view of a specific file
+func (h *HTMLHandler) DiffFile(name string, w io.Writer, r *http.Request) error {
+	tmpl_files := []string{
+		"templates/diff.html",
+		"templates/_header.html",
+		"templates/_footer.html",
+		"templates/_inline_style.html",
+	}
+	tmpl, err := template.New("diff.html").Funcs(h.fmap).ParseFS(template_files, tmpl_files...)
+	if err != nil {
+		slog.Error("template load failed", "name", name, "error", err)
+		return err
+	}
+	historyfiles := h.ds.History(name)
+	ab := []map[string]interface{}{}
+	keys := []string{"a", "b"}
+	for _, keyname := range keys {
+		buf := &bytes.Buffer{}
+		target := r.URL.Query().Get(keyname)
+		if target == "" {
+			return ErrInvalidHash
+		}
+		rdc, err := h.ds.ReadHistory(name, target)
+		if err != nil {
+			slog.Error("cannot read history", "name", name, "target", target, "error", err)
+			return ErrNotFound
+		}
+		defer rdc.Close()
+		if _, err := io.Copy(buf, rdc); err != nil {
+			slog.Error("read history", "name", name, "target", target, "error", err)
+			return err
+		}
+		target_data := make(map[string]interface{})
+		if err := json.Unmarshal(buf.Bytes(), &target_data); err != nil {
+			slog.Error("json decode", "name", name, "error", err)
+			target_data["invalid json"] = buf.String()
+		}
+		ab = append(ab, target_data)
+	}
+	differ := gojsondiff.New()
+	diffs := differ.CompareObjects(ab[0], ab[1])
+	diffconfig := formatter.AsciiFormatterConfig{
+		ShowArrayIndex: true,
+		Coloring:       false,
+	}
+	fmter := formatter.NewAsciiFormatter(ab[0], diffconfig)
+	diffString, err := fmter.Format(diffs)
+	if err != nil {
+		slog.Error("diff format", "name", name, "error", err)
+		return err
+	}
+	data := make(map[string]interface{})
+	data["name"] = ""
+	data["file"] = name
+	data["aname"] = keys[0]
+	data["bname"] = keys[1]
+	data["a"] = ab[0]
+	data["b"] = ab[1]
+	data["diff"] = diffString
+	data["history"] = historyfiles
+	data["Title"] = name
+	data["basepath"] = h.basepath
+	if err := tmpl.Execute(w, data); err != nil {
+		slog.Error("template", "name", name, "error", err)
+		return err
+	}
+	return nil
+}
+
 // ServeHTTP routes HTTP requests to the appropriate HTML handler methods
 func (h *HTMLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	st := time.Now()
@@ -234,6 +315,9 @@ func (h *HTMLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else if strings.HasPrefix(path, "view/") {
 		name := strings.TrimPrefix(path, "view/")
 		err = h.ViewFile(name, buf, r)
+	} else if strings.HasPrefix(path, "diff/") {
+		name := strings.TrimPrefix(path, "diff/")
+		err = h.DiffFile(name, buf, r)
 	} else {
 		err = h.Resource(path, buf, r)
 	}

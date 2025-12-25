@@ -1,0 +1,21 @@
+{{define "header"}}
+<ul class="nav nav-tabs">
+<li class="nav-item"><a href="{{.basepath}}" class="nav-link">🏠</a></li>
+{{- $prev := ""}}
+{{- range $i, $h := .history}}
+    {{- $mark := ""}}
+    {{- if $h.Locked}}
+        {{- $mark = "*"}}
+    {{- end}}
+    {{- if ne $i 0 }}
+    <li class="nav-item"><a href="{{$.basepath}}diff/{{$.file}}?a={{$prev}}&b={{$h.Name}}" class="nav-link active">↔️</a></li>
+    {{- end }}
+    {{- if (or (and (eq $.name "") $h.Locked) (eq $.name $h.Name))}}
+    <li class="nav-item"><a href="{{$.basepath}}view/{{$.file}}?history={{$h.Name}}" class="nav-link active" aria-current="page">{{$mark}}{{mytime $h.Timestamp}} ({{mybytes .Size}})</a></li>
+    {{- else}}
+    <li class="nav-item"><a href="{{$.basepath}}view/{{$.file}}?history={{$h.Name}}" class="nav-link">{{$mark}}{{mytime $h.Timestamp}} ({{mybytes $h.Size}})</a></li>
+    {{- end}}
+    {{- $prev = $h.Name }}
+{{- end}}
+</ul>
+{{end}}

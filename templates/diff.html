@@ -9,9 +9,7 @@
     </head>
     <body>
         {{template "header" .}}
-        <div class="p-2">
-            <andypf-json-viewer expanded="3" theme="monokai" id="output">{{toJson .data}}</andypf-json-viewer>
-        </div>
+        <div class="p-2"><pre>{{.diff}}</pre></div>
         {{template "footer"}}
     </body>
 </html>
