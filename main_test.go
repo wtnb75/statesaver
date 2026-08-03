@@ -1,8 +1,10 @@
 package main
 
 import (
+	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -190,6 +192,89 @@ func TestRealMain_Prune(t *testing.T) {
 	exitCode := realMain()
 	if exitCode != 0 {
 		t.Logf("exit code: %d for 'prune' command", exitCode)
+	}
+}
+
+func TestRealMain_Version(t *testing.T) {
+	origArgs := os.Args
+	origDatadir := option.Datadir
+	origStdout := os.Stdout
+	defer func() {
+		os.Args = origArgs
+		option.Datadir = origDatadir
+		os.Stdout = origStdout
+	}()
+
+	tmpDir := t.TempDir()
+	os.Args = []string{"program", "--data-dir", tmpDir, "version"}
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal("pipe", err)
+	}
+	os.Stdout = w
+
+	exitCode := realMain()
+
+	if err := w.Close(); err != nil {
+		t.Error("write close", err)
+	}
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Error("read", err)
+	}
+
+	if exitCode != 0 {
+		t.Errorf("expected exit code 0 for 'version' command, got %d", exitCode)
+	}
+	if !strings.Contains(string(out), "statesaver") {
+		t.Error("missing command name", string(out))
+	}
+	if !strings.Contains(string(out), version) {
+		t.Error("missing version", string(out))
+	}
+}
+
+func TestRealMain_VersionFull(t *testing.T) {
+	origArgs := os.Args
+	origDatadir := option.Datadir
+	origStdout := os.Stdout
+	defer func() {
+		os.Args = origArgs
+		option.Datadir = origDatadir
+		os.Stdout = origStdout
+	}()
+
+	tmpDir := t.TempDir()
+	os.Args = []string{"program", "--data-dir", tmpDir, "version", "--full-version"}
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal("pipe", err)
+	}
+	os.Stdout = w
+
+	exitCode := realMain()
+
+	if err := w.Close(); err != nil {
+		t.Error("write close", err)
+	}
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Error("read", err)
+	}
+
+	if exitCode != 0 {
+		t.Errorf("expected exit code 0 for 'version --full-version' command, got %d", exitCode)
+	}
+	if !strings.Contains(string(out), "hash") {
+		t.Error("missing hash", string(out))
+	}
+	if !strings.Contains(string(out), commit) {
+		t.Error("missing commit", string(out))
+	}
+	if !strings.Contains(string(out), date) {
+		t.Error("missing date", string(out))
 	}
 }
 

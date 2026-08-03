@@ -43,6 +43,7 @@ func realMain() int {
 		{Name: "prune", Short: "prune history", Long: "remove old history", Data: &Prune{}},
 		{Name: "rollback", Short: "rollback to history", Long: "rollback to history", Data: &HistoryRollback{}},
 		{Name: "edit", Short: "edit file", Long: "edit file in editor", Data: &EditFile{}},
+		{Name: "version", Short: "show version", Long: "show version and exit", Data: &VersionCmd{}},
 	}
 	parser := flags.NewParser(&option, flags.Default)
 	for _, cmd := range commands {
