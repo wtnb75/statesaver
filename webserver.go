@@ -153,7 +153,7 @@ func (h *HTMLHandler) Index(path string, w io.Writer, r *http.Request) error {
 		files = append(files, e)
 		return nil
 	})
-	entries := make(map[string]interface{})
+	entries := make(map[string]any)
 	entries["Files"] = files
 	entries["Title"] = "index"
 	entries["basepath"] = h.basepath
@@ -211,12 +211,12 @@ func (h *HTMLHandler) ViewFile(name string, w io.Writer, r *http.Request) error 
 			return ErrNotFound
 		}
 	}
-	target_data := make(map[string]interface{})
+	target_data := make(map[string]any)
 	if err := json.Unmarshal(buf.Bytes(), &target_data); err != nil {
 		slog.Error("json decode", "name", name, "error", err)
 		target_data["invalid json"] = buf.String()
 	}
-	data := make(map[string]interface{})
+	data := make(map[string]any)
 	data["name"] = target
 	data["file"] = name
 	data["data"] = target_data
@@ -244,7 +244,7 @@ func (h *HTMLHandler) DiffFile(name string, w io.Writer, r *http.Request) error 
 		return err
 	}
 	historyfiles := h.ds.History(name)
-	ab := []map[string]interface{}{}
+	ab := []map[string]any{}
 	keys := []string{"a", "b"}
 	for _, keyname := range keys {
 		buf := &bytes.Buffer{}
@@ -262,7 +262,7 @@ func (h *HTMLHandler) DiffFile(name string, w io.Writer, r *http.Request) error 
 			slog.Error("read history", "name", name, "target", target, "error", err)
 			return err
 		}
-		target_data := make(map[string]interface{})
+		target_data := make(map[string]any)
 		if err := json.Unmarshal(buf.Bytes(), &target_data); err != nil {
 			slog.Error("json decode", "name", name, "error", err)
 			target_data["invalid json"] = buf.String()
@@ -281,7 +281,7 @@ func (h *HTMLHandler) DiffFile(name string, w io.Writer, r *http.Request) error 
 		slog.Error("diff format", "name", name, "error", err)
 		return err
 	}
-	data := make(map[string]interface{})
+	data := make(map[string]any)
 	data["name"] = ""
 	data["file"] = name
 	data["aname"] = keys[0]
@@ -312,11 +312,11 @@ func (h *HTMLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if path == "" {
 		err = h.Index(path, buf, r)
-	} else if strings.HasPrefix(path, "view/") {
-		name := strings.TrimPrefix(path, "view/")
+	} else if after, ok := strings.CutPrefix(path, "view/"); ok {
+		name := after
 		err = h.ViewFile(name, buf, r)
-	} else if strings.HasPrefix(path, "diff/") {
-		name := strings.TrimPrefix(path, "diff/")
+	} else if after, ok := strings.CutPrefix(path, "diff/"); ok {
+		name := after
 		err = h.DiffFile(name, buf, r)
 	} else {
 		err = h.Resource(path, buf, r)
