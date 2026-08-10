@@ -26,13 +26,13 @@ func TestParseJSON(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     string
-		expected  map[string]interface{}
+		expected  map[string]any
 		shouldErr bool
 	}{
 		{
 			name:     "valid json",
 			input:    `{"key":"value","id":123}`,
-			expected: map[string]interface{}{"key": "value", "id": float64(123)},
+			expected: map[string]any{"key": "value", "id": float64(123)},
 		},
 		{
 			name:      "invalid json",
@@ -42,7 +42,7 @@ func TestParseJSON(t *testing.T) {
 		{
 			name:     "empty json",
 			input:    "{}",
-			expected: map[string]interface{}{},
+			expected: map[string]any{},
 		},
 	}
 
@@ -293,7 +293,7 @@ func TestHistory(t *testing.T) {
 
 	filename := "myfile"
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		content := "version " + string(rune(48+i))
 		reader := strings.NewReader(content)
 		err := ds.Write(filename, reader, []byte{}, "")
@@ -359,7 +359,7 @@ func TestPrune(t *testing.T) {
 
 	filename := "myfile"
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		content := "version" + string(rune(48+i))
 		reader := strings.NewReader(content)
 		err := ds.Write(filename, reader, []byte{}, "")
@@ -391,7 +391,7 @@ func TestPruneDry(t *testing.T) {
 
 	filename := "myfile"
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		content := "version" + string(rune(48+i))
 		reader := strings.NewReader(content)
 		err := ds.Write(filename, reader, []byte{}, "")
@@ -467,7 +467,7 @@ func TestWriteWithLock(t *testing.T) {
 
 	filename := "myfile"
 	lockID := "lock123"
-	lockinfo := map[string]interface{}{"ID": lockID}
+	lockinfo := map[string]any{"ID": lockID}
 	lockinfoByte, _ := json.Marshal(lockinfo)
 
 	err := ds.Lock(filename, string(lockinfoByte))

@@ -47,8 +47,8 @@ func NewDatastore(root string) Datastore {
 }
 
 // ParseJSON parses a JSON string into a map
-func (d *Datastore) ParseJSON(data string) map[string]interface{} {
-	res := make(map[string]interface{})
+func (d *Datastore) ParseJSON(data string) map[string]any {
+	res := make(map[string]any)
 	if err := json.Unmarshal([]byte(data), &res); err != nil {
 		slog.Error("json parse error", "error", err)
 		return nil

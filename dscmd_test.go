@@ -199,7 +199,7 @@ func TestHistory_Execute(t *testing.T) {
 
 	// Setup test data with multiple versions
 	ds := NewDatastore(tmp)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		reader := strings.NewReader("version " + string(rune(48+i)))
 		if err := ds.Write("test", reader, []byte{}, ""); err != nil {
 			t.Fatalf("Write failed: %v", err)
@@ -225,7 +225,7 @@ func TestPrune_Execute(t *testing.T) {
 
 	// Setup test data with multiple versions
 	ds := NewDatastore(tmp)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		reader := strings.NewReader("version " + string(rune(48+i)))
 		if err := ds.Write("test", reader, []byte{}, ""); err != nil {
 			t.Fatalf("Write failed: %v", err)
@@ -254,7 +254,7 @@ func TestPrune_DryRun(t *testing.T) {
 
 	// Setup test data
 	ds := NewDatastore(tmp)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		reader := strings.NewReader("version " + string(rune(48+i)))
 		if err := ds.Write("test", reader, []byte{}, ""); err != nil {
 			t.Fatalf("Write failed: %v", err)
@@ -380,9 +380,9 @@ func TestPrune_All(t *testing.T) {
 
 	// Setup test data in multiple files
 	ds := NewDatastore(tmp)
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		fname := "file" + string(rune(49+i))
-		for j := 0; j < 3; j++ {
+		for j := range 3 {
 			reader := strings.NewReader("v" + string(rune(49+j)))
 			if err := ds.Write(fname, reader, []byte{}, ""); err != nil {
 				t.Fatalf("Write failed: %v", err)
