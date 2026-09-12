@@ -50,7 +50,7 @@ func (h *APIHandler) APIDelete(path string, w io.Writer, r *http.Request) error 
 
 // APIPost handles POST requests to write file contents
 func (h *APIHandler) APIPost(path string, w io.Writer, r *http.Request) error {
-	hashb, err0 := base64.StdEncoding.DecodeString(r.Header.Get("content-md5"))
+	hashb, err0 := base64.StdEncoding.DecodeString(r.Header.Get("Content-MD5"))
 	if err0 != nil {
 		hashb = []byte{}
 	}
@@ -99,7 +99,7 @@ func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Add("Content-Length", strconv.Itoa(buf.Len()))
 	md5sum := md5.Sum(buf.Bytes())
-	w.Header().Add("Content-Md5", base64.StdEncoding.EncodeToString(md5sum[:]))
+	w.Header().Add("Content-MD5", base64.StdEncoding.EncodeToString(md5sum[:]))
 	var statuscode int
 	switch err {
 	case nil:
@@ -323,7 +323,7 @@ func (h *HTMLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Add("Content-Length", strconv.Itoa(buf.Len()))
 	md5sum := md5.Sum(buf.Bytes())
-	w.Header().Add("Content-Md5", base64.StdEncoding.EncodeToString(md5sum[:]))
+	w.Header().Add("Content-MD5", base64.StdEncoding.EncodeToString(md5sum[:]))
 	var statuscode int
 	switch err {
 	case nil:
