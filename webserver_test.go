@@ -79,7 +79,7 @@ func TestAPIGet_Success(t *testing.T) {
 	// verify md5 header
 	sum := md5.Sum([]byte("hello"))
 	expect := base64.StdEncoding.EncodeToString(sum[:])
-	if got := rr.Header().Get("content-md5"); got != expect {
+	if got := rr.Header().Get("Content-MD5"); got != expect {
 		t.Fatalf("content-md5 mismatch: %s vs %s", got, expect)
 	}
 }
@@ -114,7 +114,7 @@ func TestAPIPost_Write(t *testing.T) {
 	ds := &mockDS{}
 	h := &APIHandler{ds: ds}
 	req := httptest.NewRequest(http.MethodPost, "/api/f", strings.NewReader(body))
-	req.Header.Set("content-md5", md5b64)
+	req.Header.Set("Content-MD5", md5b64)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
